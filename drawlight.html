@@ -1,0 +1,279 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<head>
+<title>Network diagram generator</title>
+</head>
+<body>
+<svg class="chart" xmlns="http://www.w3.org/2000/svg" xmlns:xlink='http://www.w3.org/1999/xlink'>
+</svg>
+<style>
+.chart rect.network-zone{
+	#fill: steelblue;
+	fill-opacity: 0.5;
+	stroke: black;
+	stroke-width: 2;
+	
+}
+
+rect#component{
+	#fill: grey;
+	fill-opacity: 0.5
+	stroke: black;
+	stroke-width:2;
+}
+.chart line{
+	stroke-width: 3;
+	#stroke: black;
+}
+</style>
+<script>
+var separation=100;
+var width=1000;
+var data={
+  "networks": [
+    { 
+	  "name":"corporate-internal",
+      "components":[
+	  {"type":"laptop","name":"LAPTOP-DEV01",'x':width/3,'y':20},
+	  {"type":"laptop","name":"LAPTOP-DEV02",'x':width*2/3,'y':20}
+	  ],
+	  "height":100,
+	  "width":1000,
+	  "x":10
+	  
+    },
+    {
+      "name":"corporate-DMZ",
+      "components":[
+        {"type":"load-balancer","name":"corporate-INTERNAL-LB","url":"load-balancer-icon-0.png",'x':width/2-30,'y':220}
+	  ],
+		"height":100,
+		"width":1000,
+		"x":10
+		
+    },
+	{
+		"name":"corporate-firewall",
+		"height":100,
+		"width":1000,
+		"x":10,
+		'components':[
+		{type:'firewall','name':'noneshallpass.corporate.com',x:width/2-30,y:420}
+		]
+		
+	},
+	{
+		"name":"Azure",
+		"components":[
+		{type:'server',name:'devtest-identity',x:width/2-25,y:630}
+		],
+		"height":100,
+		"width":1000,
+		"x":10
+	}
+  ],
+  "connections":[
+  {"start":"corporate-internal","end":"corporate-DMZ","start_arrow":"true","end_arrow":"true"},
+  {"start":"corporate-DMZ","end":"corporate-firewall","start_arrow":"true","end_arrow":"true"},
+  {"start":"corporate-firewall","end":"Azure","start_arrow":"true","end_arrow":"true"}
+  ]
+}
+
+
+function cumY(i,separation){
+    var height=0;
+	if(i==0){
+	    height=10;
+	}
+	else{
+		for(var j=0;j<i;j++){
+	  		height=height+data.networks[j].height+separation;	
+		}
+	}
+	console.log(i+":"+height);
+	return height+10;
+}
+
+function findBottomYOfRect(name){
+	var rect=d3.select("rect#"+name);
+	//console.log("y"+rect.attr("y")+":height:"+rect.attr("height"))	;
+	return (rect.attr("y")*1+rect.attr("height")*1)+5;
+}
+
+function findTopYOfRect(name){
+	var rect=d3.select("rect#"+name);
+	return (rect.attr("y")*1-5);
+}
+function findXOfRect(name){
+	var rect=d3.select("rect#"+name);
+	return (rect.attr('width')/2);
+}
+
+var markers= [
+    { id: 0, name: 'circle', path: 'M 0, 0  m -5, 0  a 5,5 0 1,0 10,0  a 5,5 0 1,0 -10,0', viewbox: '-6 -6 12 12',orient:'auto' }
+  , { id: 1, name: 'square', path: 'M 0,0 m -5,-5 L 5,-5 L 5,5 L -5,5 Z', viewbox: '-5 -5 10 10',orient: 'auto' }
+  , { id: 2, name: 'arrow_start', path: 'M 0,0 m -5,-5 L 5,0 L -5,5 Z', viewbox: '-5 -5 10 10',orient:'270' }
+  , { id: 3, name: 'arrow_end', path: 'M 0,0 m -5,-5 L 5,0 L -5,5 Z', viewbox: '-5 -5 10 10',orient:'auto'}
+  , { id: 4, name: 'stub', path: 'M 0,0 m -1,-5 L 1,-5 L 1,5 L -1,5 Z', viewbox: '-1 -5 2 10',orient:'auto' }
+  ]
+
+var prefix='./Microsoft_CloudnEnterprise_Symbols_v2.5_PUBLIC/Symbols/';
+var icons=[
+{id:0,name:'laptop',url:prefix+'CnE_Enterprise/Laptop computer.png'},
+{id:1,name:'load-balancer',url:prefix+'CnE_Enterprise/Load balancer (Generic).png'},
+{id:2,name:'server',url:prefix+'CnE_Enterprise/Server (generic).png'},
+{id:3,name:'snow-instance',url:prefix+'/service-now.png'},
+{id:4,name:'firewall',url:prefix+'CnE_Enterprise/Firewall.png'}
+]
+
+function fComponents(d){
+	console.log(d.components);
+	if(d.components){
+		return d.components;
+	
+	}
+	else{
+		return [];
+	}
+	
+}
+
+var color=d3.scaleOrdinal(d3.schemeCategory10);
+var width=1080,height=800;
+var y=d3.scaleLinear().domain([0,data.networks.length]).range([0,width+100*data.connections.length])
+var chart=d3.select(".chart").attr("width",width)
+            .attr("height",height*data.networks.length+100*data.networks.length-1);
+
+var defs=chart.append('defs');
+var icons=defs.selectAll('pattern').data(icons).enter()
+				.append('pattern')
+				.attr('width',50)
+				.attr('height',50)
+				.attr('id',function(d){return d.name;})
+				.append('image')
+				.attr('xlink:href',function(d){return d.url;})
+				.attr('width',50)
+				.attr('height',50)
+				.text(function(d){return d.name;})
+				;
+				
+var markers=chart.selectAll('marker')
+    .data(markers)
+    .enter()
+    .append('svg:marker')
+      .attr('id', function(d){ return 'marker_' + d.name})
+      .attr('markerHeight', 3)
+      .attr('markerWidth', 3)
+      .attr('markerUnits', 'strokeWidth')
+      .attr('orient',function(d){if(d.orient){return d.orient;}else{return 'auto';}})
+      .attr('refX', 0)
+      .attr('refY', 0)
+      .attr('viewBox', function(d){ return d.viewbox })
+      .append('svg:path')
+        .attr('d', function(d){ return d.path })
+        .attr('fill', function(d,i) { return color(10)});
+
+
+var networks=chart.selectAll("g").data(data.networks).enter()
+                  .append('svg')
+				  .attr('class','network-zone')
+				  .attr('id',function(d,i){return d.name;});
+				  
+				  
+var network_zone=networks.append("rect")
+				  .attr('class','network-zone')
+				  .attr("id",function(d,i){return d.name;})
+				  .attr("width",function(d,i){return d.width;})
+				  .attr("height",function(d,i){return d.height;})
+				  .attr("x",function(d,i){return d.x;})
+				  .attr("y",function(d,i){return cumY(i,separation);})
+				  .attr("rx",20)
+				  .attr("ry",20)
+				  .attr("fill",function(d,i){return color(i)})
+				  //.append('g').attr('class','components')
+				  
+		
+var component_groups=chart.selectAll('g')
+						  .data(data.networks)
+						  .enter()
+						  .append('g')
+						  .attr('class','components')
+						  .attr('id',function(d){return d.name;})
+				  ;
+
+var components=component_groups.selectAll('g.components')
+					.data(function(d){return d.components;})
+					.enter()
+					.append('rect')
+					.attr('x',function(d){return d.x;})
+					.attr('y',function(d){return d.y;})
+					.attr('id',function(d){return d.name;})
+					.attr('width',50)
+					.attr('height',50)
+					.attr('fill',function(d){return 'url(#'+d.type+')';})
+					
+					
+var component_labels=component_groups.selectAll('g.components')
+					.data(function(d){return d.components;})
+					.enter()
+					.append('text')
+					.attr('class','components')
+					.attr('y',function(d){console.log(d.y);return d.y+60;})
+					.attr('x',function(d){return d.x+25;})
+					.attr('font-family','sans-serif')
+					.attr('text-anchor','middle')
+					.attr('font-size','10px')
+					.attr('fill','black')
+					.text(function(d){return d.name;})
+					;
+
+//console.log(networks.selectAll("image").data(function(d){return d;}).enter().append("img"));
+/*
+var components=chart.selectAll('g').data(data.networks,components)
+						.enter()
+						.append('g.components')
+						.append("rect")
+						.attr('class','component')
+						//.attr('id',function(d){return d;})
+						//.attr("xlink:href",function(d){return d.url;})
+						//.attr('src',function(d){return d.url;})
+						.attr("width",'500')
+						.attr("height",'100')
+						.text(function(d){return d.name;})
+						.attr('x',50)
+						.attr('y',50)
+						//.attr('xmlns:xlink','http://www.w3.org/1999/xlink');
+*/
+				  
+var network_labels=networks.selectAll('svg.network-zone').data(data.networks).enter()
+						   .append("text")
+						   .attr("y",function(d,i){return findBottomYOfRect(d.name)-14;})
+						   .attr("x",function(d,i){return findXOfRect(d.name);})
+						   .text(function(d){return d.name;})
+						   .attr("font-family","sans-serif")
+						   .attr("text-anchor","middle")
+						   .attr("font-size","14px")
+						   .attr("fill","black");
+						   
+//network_components=networks.selectAll("img").data(data.networks)
+				 
+var connections=chart.selectAll("line").data(data.connections).enter().append("line")
+                     .attr("y1",function(d,i){return findBottomYOfRect(d.start);})
+					 .attr("x1",function(d,i){return findXOfRect(d.start);})
+					 .attr("y2",function(d,i){return findTopYOfRect(d.end);})
+					 .attr("x2",function(d,i){return findXOfRect(d.end);})
+					 .attr("stroke",color(10))
+					 .attr("marker-start",function(d,i){if(d.start_arrow=='true'){return 'url(#marker_arrow_start)';}})
+					 .attr("marker-end",function(d,i){if(d.end_arrow=='true'){return 'url(#marker_arrow_end)';}})
+					 ;
+					 
+				
+//console.log(findYOfRect(data.connections[0].start));
+                     				  
+	
+</script>
+</body>
+</html>
